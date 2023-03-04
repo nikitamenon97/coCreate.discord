@@ -77,8 +77,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   
     if (interaction.type === InteractionType.ModalSubmit) {
       if (interaction.customId === 'proposal-modal') {
-        const response =
-          interaction.fields.getTextInputValue('proposal-title');
  
         // get entity ID from discord username
         const coCreate_userid = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/users/discord/${interaction.user.username}`,

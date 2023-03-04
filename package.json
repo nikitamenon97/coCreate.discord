@@ -10,6 +10,7 @@
   "license": "ISC",
   "dependencies": {
     "@walletconnect/client": "^1.8.0",
+    "axios": "^1.3.4",
     "discord.js": "^14.7.1",
     "node-fetch": "^3.3.0",
     "undici": "^5.20.0"
