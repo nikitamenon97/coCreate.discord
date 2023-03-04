@@ -4,6 +4,8 @@ const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch
 const config = require("./config.json");
 const axios = require('axios');
 
+let proj_id = "";
+
 const client = new Discord.Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,44 +24,6 @@ client.on(Discord.Events.MessageCreate, async function(message) {
   const args = commandBody.split(' ');
   const command = args.shift().toLowerCase();
 
-  if (command === "view" || command == "join") {
-      const get_all_projects = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`)
-        .then(response => response.json()); 
-
-        console.log("project[0]:", get_all_projects[0]);
-        const dropdown_options_list = []
-        get_all_projects.data.forEach(project => {
-        {
-			dropdown_options_list.push(
-                {
-                    label: project.title,
-					description: project.description,
-					value: project.projectId,
-				}
-            )
-        }
-        });
-
-      let view_project_dropdown = new ActionRowBuilder();
-      view_project_dropdown.addComponents(
-        new StringSelectMenuBuilder()
-            .setCustomId('project-dropdown')
-            .setPlaceholder('Nothing selected')
-            .addOptions(dropdown_options_list)
-      );
-
-        message.reply({
-          content: "The projects currently running are:", components: [view_project_dropdown],
-          });
-          
-    //   if (command == "join"){ 
-    //     message.reply({
-    //       content: "The projects currently running are:", components: [view_project_dropdown],
-    //       });
-    //     }
-
-  }
-
   if (command === "create") {
     let create_project_button = new ActionRowBuilder();
     create_project_button.addComponents(
@@ -73,6 +37,68 @@ client.on(Discord.Events.MessageCreate, async function(message) {
     });
   }
 
+  if (command === "view") {
+    const get_all_projects = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`)
+      .then(response => response.json()); 
+
+      console.log("project[0]:", get_all_projects[0]);
+      const dropdown_options_list = []
+      get_all_projects.data.forEach(project => {
+      {
+          dropdown_options_list.push(
+              {
+                  label: project.title,
+                  description: project.description,
+                  value: project.projectId,
+              }
+          )
+      }
+      });
+
+    let view_project_dropdown = new ActionRowBuilder();
+    view_project_dropdown.addComponents(
+      new StringSelectMenuBuilder()
+          .setCustomId('view-project-dropdown')
+          .setPlaceholder('Nothing selected')
+          .addOptions(dropdown_options_list)
+    );
+
+      message.reply({
+        content: "The projects currently running are:", components: [view_project_dropdown],
+        });
+  }
+
+  if (command === "join") {
+    const get_all_projects = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`)
+      .then(response => response.json()); 
+
+      const dropdown_options_list = []
+      get_all_projects.data.forEach(project => {
+      {
+          if (project.expiresAt >= Date.now()){
+            dropdown_options_list.push(
+              {
+                  label: project.title,
+                  description: project.description,
+                  value: project.projectId,
+              }
+          )
+        }
+      }
+      });
+
+    let join_project_dropdown = new ActionRowBuilder();
+    join_project_dropdown.addComponents(
+      new StringSelectMenuBuilder()
+          .setCustomId('join-project-dropdown')
+          .setPlaceholder('Nothing selected')
+          .addOptions(dropdown_options_list)
+    );
+
+      message.reply({
+        content: "The projects currently running are:", components: [join_project_dropdown],
+        });
+  }
 }
 )
 
@@ -189,10 +215,81 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
 
 	if (interaction.isStringSelectMenu()){
+        console.log("######## interaction.customId:", interaction.customId);
+        
+        if (interaction.customId == 'view-project-dropdown'){
         const get_discord_channel = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${interaction.values[0]}`)
         .then(response => response.json()); 
 
-        await interaction.reply({content: `Navigate to the channel: ${get_discord_channel.data.project_data.discordChannelId}`});
+        await interaction.reply({content: `Navigate to the channel: ${get_discord_channel.data.project_data.discordChannelName}`});
+        }
+        
+        if (interaction.customId == 'join-project-dropdown'){
+            console.log("------ proj_id:", interaction.values[0]);
+            proj_id = interaction.values[0];
+
+            const roles_options_list = [];
+            config.ROLES.forEach(role => {
+            {
+                roles_options_list.push(
+                {
+                    label: role,
+                    description: role,
+                    value: role,
+                }
+            )}});
+
+            let join_role_dropdown = new ActionRowBuilder();
+            join_role_dropdown.addComponents(
+            new StringSelectMenuBuilder()
+                .setCustomId('join-role-dropdown')
+                .setPlaceholder('Nothing selected')
+                .addOptions(roles_options_list)
+            );
+
+            interaction.reply({
+                content: "Which role would you like to join as:", components: [join_role_dropdown],
+            });
+        }
+
+        if (interaction.customId == "join-role-dropdown"){
+            console.log("After role inside role, interaction.customId:", interaction.customId, interaction.values[0]);
+
+            const coCreate_userid = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/users/discord/${interaction.user.username}`,
+            {
+                method: "GET",
+                mode: "cors", 
+                cache: "no-cache",
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+            .then(response => response.json()); 
+            console.log("?????coCreate user id:", coCreate_userid.data);
+
+            // ???? call join project api - how to pass proj ID??
+            // const proj_id = "p-b42ebf46-981a-4756-b50f-180d6350b1b8";
+            console.log("??????? Interaction", interaction.values[0]);
+            const join_project_api = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${proj_id}/join`,
+            {
+                method: "POST",
+                mode: "cors", 
+                cache: "no-cache",
+                headers: {
+                    "Content-Type": "application/json"
+                    },
+                body: JSON.stringify({"userId": coCreate_userid.data,
+                                      "role": interaction.values[0],
+                                     })
+            })
+            .then(response => response.json()); 
+
+            // then navigate to the project channel with role
+            const get_discord_channel = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${proj_id}`)
+            .then(response => response.json()); 
+    
+            await interaction.reply({content: `Joined project! Navigate to the channel: ${get_discord_channel.data.project_data.discordChannelName}`});
+        }
     }
   });
 
