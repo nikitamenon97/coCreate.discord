@@ -40,7 +40,6 @@ client.on(Discord.Events.MessageCreate, async function(message) {
         }
         });
 
-    //   console.log("dropdown options", dropdown_options_list)
       let view_project_dropdown = new ActionRowBuilder();
       view_project_dropdown.addComponents(
         new StringSelectMenuBuilder()
@@ -151,44 +150,45 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 "Content-Type": "application/json"
               }
         })
-          .then(response => response.json()); 
+        .then(response => response.json()); 
         console.log("coCreate user id:", coCreate_userid.data);
 
-        const create_proj_api_result = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`,
-            {
-                method: "POST",
-                mode: "cors", 
-                cache: "no-cache",
-                headers: {
-                    "Content-Type": "application/json"
-                  },
-                body: JSON.stringify({"title": interaction.fields.getTextInputValue('project-title'),
-                                      "description": interaction.fields.getTextInputValue('project-description'),
-                                      "authors": [coCreate_userid.data],
-                                      "links": [interaction.fields.getTextInputValue('project-link')],
-                                      "expiresAt": Date.now()+ (7 * 24 * 60 * 60 * 1000),
-                                      "discordChannelId": interaction.fields.getTextInputValue('project-channel-name')})
-            })
-              .then(response => response.json()); 
-            
-              console.log("response from api:", create_proj_api_result);
-            const channel = await interaction.guild.channels.create({
-                name: interaction.fields.getTextInputValue('project-channel-name'),
-                type: Discord.ChannelType.GuildText,
-                // parent: cat[0].ID,
-                // your permission overwrites or other options here
-            });
+        const channel = await interaction.guild.channels.create({
+            name: interaction.fields.getTextInputValue('project-channel-name'),
+            type: Discord.ChannelType.GuildText
+        });
 
-            console.log(channel);
+        // console.log(channel);
+
+        const webhook = await channel.createWebhook({'name': interaction.fields.getTextInputValue('project-channel-name')})
+        console.log('!!!!!!!webhook url', webhook.url);
+       
+        const create_proj_api_result = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`,
+        {
+            method: "POST",
+            mode: "cors", 
+            cache: "no-cache",
+            headers: {
+                "Content-Type": "application/json"
+                },
+            body: JSON.stringify({"title": interaction.fields.getTextInputValue('project-title'),
+                                    "description": interaction.fields.getTextInputValue('project-description'),
+                                    "authors": [coCreate_userid.data],
+                                    "links": [interaction.fields.getTextInputValue('project-link')],
+                                    "expiresAt": Date.now()+ (7 * 24 * 60 * 60 * 1000),
+                                    "discordChannelId": channel.id,
+                                    "discordChannelName": interaction.fields.getTextInputValue('project-channel-name'),
+                                    "discordWebhookURL": webhook.url})
+        })
+            .then(response => response.json()); 
+        
+            console.log("response from api:", create_proj_api_result);
+            
         await interaction.reply({ content: 'Your submission was received successfully! Navigate to channel: ' + interaction.fields.getTextInputValue('project-channel-name') });
-        // interaction.member.voice.setChannel(channel).catch(e => console.error(`Couldn't move the user. | ${e}`));
       }
     }
 
-    // if (!interaction.isStringSelectMenu()) return;
 	if (interaction.isStringSelectMenu()){
-        // console.log("@@@@@@@@", interaction);
-
         const get_discord_channel = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${interaction.values[0]}`)
         .then(response => response.json()); 
 
