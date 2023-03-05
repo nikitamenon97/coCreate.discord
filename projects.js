@@ -1,22 +1,15 @@
 const Discord = require("discord.js");
-const { ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle, Client, Events, GatewayIntentBits, InteractionType,ModalBuilder,TextInputBuilder,TextInputStyle,} = require('discord.js');
+const { ActionRowBuilder, StringSelectMenuBuilder, PermissionFlagsBits, ButtonBuilder, ButtonStyle, Client, Events, GatewayIntentBits, InteractionType,ModalBuilder,TextInputBuilder,TextInputStyle,} = require('discord.js');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 const config = require("./config.json");
 const axios = require('axios');
+const client = require('./client.js');
 
+// FIX LATER
 let proj_id = "";
-
-const client = new Discord.Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
-})
-
 const prefix = "/";
 
-client.on(Discord.Events.MessageCreate, async function(message) { 
+client.on(Discord.Events.MessageCreate, async (message) =>  { 
   if (message.author.bot) return;
   if (!message.content.startsWith(prefix)) return;
   
@@ -24,7 +17,7 @@ client.on(Discord.Events.MessageCreate, async function(message) {
   const args = commandBody.split(' ');
   const command = args.shift().toLowerCase();
 
-  if (command === "create") {
+  if (command === "create_project") {
     let create_project_button = new ActionRowBuilder();
     create_project_button.addComponents(
         new ButtonBuilder()
@@ -37,7 +30,7 @@ client.on(Discord.Events.MessageCreate, async function(message) {
     });
   }
 
-  if (command === "view") {
+  if (command === "view_project") {
     const get_all_projects = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`)
       .then(response => response.json()); 
 
@@ -68,7 +61,7 @@ client.on(Discord.Events.MessageCreate, async function(message) {
         });
   }
 
-  if (command === "join") {
+  if (command === "join_project") {
     const get_all_projects = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`)
       .then(response => response.json()); 
 
@@ -99,8 +92,8 @@ client.on(Discord.Events.MessageCreate, async function(message) {
         content: "The projects currently running are:", components: [join_project_dropdown],
         });
   }
-}
-)
+});
+
 
 client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isButton()) {
@@ -177,17 +170,29 @@ client.on(Events.InteractionCreate, async (interaction) => {
               }
         })
         .then(response => response.json()); 
-        console.log("coCreate user id:", coCreate_userid.data);
+        await interaction.deferReply()
 
         const channel = await interaction.guild.channels.create({
             name: interaction.fields.getTextInputValue('project-channel-name'),
-            type: Discord.ChannelType.GuildText
+            type: Discord.ChannelType.GuildText,
+            permissionOverwrites: [
+                {
+                  id: interaction.guild.roles.everyone,
+                  deny: [ PermissionFlagsBits.SendMessages],
+                  allow: [PermissionFlagsBits.ViewChannel,]
+                },
+                {
+                  id: interaction.user.id,
+                  allow: [PermissionFlagsBits.ViewChannel],
+                },
+                {
+                  id: client.user.id,
+                  allow: [PermissionFlagsBits.ViewChannel],
+                },
+              ],
         });
 
-        // console.log(channel);
-
         const webhook = await channel.createWebhook({'name': interaction.fields.getTextInputValue('project-channel-name')})
-        console.log('!!!!!!!webhook url', webhook.url);
        
         const create_proj_api_result = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects`,
         {
@@ -205,18 +210,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                     "discordChannelId": channel.id,
                                     "discordChannelName": interaction.fields.getTextInputValue('project-channel-name'),
                                     "discordWebhookURL": webhook.url})
-        })
-            .then(response => response.json()); 
-        
-            console.log("response from api:", create_proj_api_result);
-            
-        await interaction.reply({ content: 'Your submission was received successfully! Navigate to channel: ' + interaction.fields.getTextInputValue('project-channel-name') });
+            })
+        .then(response => response.json()); 
+
+        await interaction.editReply({ content: 'Your submission was received successfully! Navigate to channel: ' + interaction.fields.getTextInputValue('project-channel-name') });
       }
     }
 
 	if (interaction.isStringSelectMenu()){
-        console.log("######## interaction.customId:", interaction.customId);
-        
         if (interaction.customId == 'view-project-dropdown'){
         const get_discord_channel = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${interaction.values[0]}`)
         .then(response => response.json()); 
@@ -253,8 +254,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
 
         if (interaction.customId == "join-role-dropdown"){
-            console.log("After role inside role, interaction.customId:", interaction.customId, interaction.values[0]);
-
             const coCreate_userid = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/users/discord/${interaction.user.username}`,
             {
                 method: "GET",
@@ -265,11 +264,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
             })
             .then(response => response.json()); 
-            console.log("?????coCreate user id:", coCreate_userid.data);
 
-            // ???? call join project api - how to pass proj ID??
-            // const proj_id = "p-b42ebf46-981a-4756-b50f-180d6350b1b8";
-            console.log("??????? Interaction", interaction.values[0]);
             const join_project_api = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${proj_id}/join`,
             {
                 method: "POST",
@@ -284,7 +279,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
             })
             .then(response => response.json()); 
 
-            // then navigate to the project channel with role
             const get_discord_channel = await fetch(`${config.CoCreate_BASE_URL}/api/entities/${config.ENTITY_ID}/projects/${proj_id}`)
             .then(response => response.json()); 
     
@@ -292,5 +286,3 @@ client.on(Events.InteractionCreate, async (interaction) => {
         }
     }
   });
-
-client.login(config.BOT_TOKEN);
